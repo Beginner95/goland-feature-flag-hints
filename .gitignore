@@ -1,0 +1,15 @@
+# Build output
+bin/
+plugin/build/
+plugin/.gradle/
+plugin/gradle/wrapper/gradle-wrapper.jar
+
+# Gradle caches
+.gradle/
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
