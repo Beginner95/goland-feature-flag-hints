@@ -1,6 +1,6 @@
-# GoLand Feature Flag Hints
+# GoLand/VSCode Feature Flag Hints
 
-A GoLand plugin that shows the **production state of [Flipt](https://flipt.io/) feature flags inline in Go code**, and a CLI tool to sync flag states from Flipt.
+A plugin for **GoLand** and **VSCode** that shows the **production state of [Flipt](https://flipt.io/) feature flags inline in Go code**, and a CLI tool to sync flag states from Flipt.
 
 ```go
 if !i.ff.IsEnabled(ctx, tmpFFDisconnectedConsumer) { // false
@@ -15,7 +15,8 @@ if p.feature.IsEnabled(ctx, ffOutboxEventTaskCreatedTopic) { // true
 ## How it works
 
 1. **`flipt-sync`** - a CLI tool that fetches all feature flags from Flipt REST API and writes them to `feature-flags.json` in your project root.
-2. **GoLand plugin** - reads `feature-flags.json` and adds inlay hints next to every `IsEnabled()` call in your Go code. Supports both string literals and named constants as flag arguments.
+2. **GoLand plugin** - reads `feature-flags.json` and adds inlay hints next to every `IsEnabled()` call in your Go code.
+3. **VSCode extension** - same functionality for VSCode users.
 
 ---
 
@@ -149,8 +150,13 @@ goland-feature-flag-hints/
 │   ├── build.gradle.kts
 │   ├── gradle.properties
 │   └── src/main/kotlin/ru/webvaha/ffplugin/
-│       ├── FeatureFlagService.kt          # reads & caches feature-flags.json
-│       └── FeatureFlagInlayHintsProvider.kt  # inlay hints in Go editor
+│       ├── FeatureFlagService.kt
+│       └── FeatureFlagInlayHintsProvider.kt
+├── vscode-plugin/       # VSCode extension (TypeScript)
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
+│       └── extension.ts
 └── go.mod
 ```
 
