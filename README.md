@@ -2,12 +2,12 @@
 
 A GoLand plugin that shows the **production state of [Flipt](https://flipt.io/) feature flags inline in Go code**, and a CLI tool to sync flag states from Flipt.
 
-```go
-if !i.ff.IsEnabled(ctx, tmpFFDisconnectedConsumer) { // false
-```
+Works with any method name and any SDK wrapper - detection is based on flag key values, not method names.
 
 ```go
-if p.feature.IsEnabled(ctx, ffOutboxEventTaskCreatedTopic) { // true
+if !i.ff.IsEnabled(ctx, tmpFFDisconnectedConsumer) {        // false
+if p.feature.IsEnabled(ctx, "ff_tmp_outbox_event") {        // true
+voxID := c.feature.GetVoxCampaignID(ctx, entity.FFVoxEnabled, ...) // true
 ```
 
 ---
@@ -15,7 +15,7 @@ if p.feature.IsEnabled(ctx, ffOutboxEventTaskCreatedTopic) { // true
 ## How it works
 
 1. **`flipt-sync`** - a CLI tool that fetches all feature flags from Flipt REST API and writes them to `feature-flags.json` in your project root.
-2. **GoLand plugin** - reads `feature-flags.json` and adds inlay hints next to every `IsEnabled()` call in your Go code. Supports both string literals and named constants as flag arguments.
+2. **GoLand plugin** - reads `feature-flags.json` and adds inlay hints next to every string or constant in Go code whose value matches a flag key. Supports string literals, local constants, and package-level constants.
 
 ---
 
@@ -116,7 +116,7 @@ After installing the plugin, make sure inlay hints are enabled in GoLand:
 FLIPT_URL=https://flipt.example.com flipt-sync
 
 # 2. Open your project in GoLand
-# → inlay hints appear automatically next to every IsEnabled() call
+# → inlay hints appear automatically next to every flag key in code
 ```
 
 The plugin reloads `feature-flags.json` automatically whenever the file changes - no IDE restart needed.
@@ -125,16 +125,21 @@ The plugin reloads `feature-flags.json` automatically whenever the file changes 
 
 ## Supported call patterns
 
-The plugin resolves both string literals and named Go constants:
+Detection is key-based: the plugin shows a hint wherever a string value matches a key in `feature-flags.json`, regardless of method name or SDK.
 
 ```go
-const myFlag = "my_feature_flag"
+// String literal - any method, any SDK
+ff.IsEnabled(ctx, "my_feature_flag")          // true
+client.Evaluate("my_feature_flag", entityID)  // true
+ff.Check(ctx, "my_feature_flag")              // true
 
-// string literal
-ff.IsEnabled(ctx, "my_feature_flag") // prod:✓
+// Local named constant
+const myFlag = "my_feature_flag"              // true  ← hint at definition too
+ff.IsEnabled(ctx, myFlag)                     // true
 
-// named constant
-ff.IsEnabled(ctx, myFlag)            // prod:✓
+// Package-level constant
+// entity/feature_flags.go: const FFVoxEnabled = "vox_enabled"
+ff.GetVoxCampaignID(ctx, entity.FFVoxEnabled, ...) // true
 ```
 
 ---
@@ -149,8 +154,9 @@ goland-feature-flag-hints/
 │   ├── build.gradle.kts
 │   ├── gradle.properties
 │   └── src/main/kotlin/ru/webvaha/ffplugin/
-│       ├── FeatureFlagService.kt          # reads & caches feature-flags.json
+│       ├── FeatureFlagService.kt             # reads & caches feature-flags.json
 │       └── FeatureFlagInlayHintsProvider.kt  # inlay hints in Go editor
+├── CHANGELOG.md
 └── go.mod
 ```
 

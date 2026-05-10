@@ -40,7 +40,7 @@ class FeatureFlagService(private val project: Project) {
 
     /**
      * Минималистичный парсер JSON объекта вида {"key": true/false, ...}.
-     * Не тянет лишних зависимостей — IntelliJ Platform уже включает Gson,
+     * Не тянет лишних зависимостей - IntelliJ Platform уже включает Gson,
      * но лучше не полагаться на детали реализации платформы.
      */
     private fun parseFlags(json: String): Map<String, Boolean> {

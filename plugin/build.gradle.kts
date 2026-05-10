@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "ru.webvaha"
-version = "1.0.0"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -27,6 +27,6 @@ kotlin {
 tasks {
     patchPluginXml {
         sinceBuild.set("233")   // GoLand 2023.3
-        untilBuild.set("")      // без верхней границы — совместим с любой версией
+        untilBuild.set("")      // без верхней границы - совместим с любой версией
     }
 }

@@ -1,6 +1,5 @@
 package ru.webvaha.ffplugin
 
-import com.goide.psi.GoCallExpr
 import com.goide.psi.GoConstDefinition
 import com.goide.psi.GoConstSpec
 import com.goide.psi.GoReferenceExpression
@@ -20,14 +19,16 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 
 /**
- * Добавляет inlay-подсказки рядом с аргументом-флагом в вызовах IsEnabled:
+ * Добавляет inlay-подсказки рядом с любым строковым значением, совпадающим
+ * с ключом из feature-flags.json - независимо от имени метода или SDK:
  *
- *   if !i.ff.IsEnabled(ctx, tmpFFDisconnectedConsumer) { // [false]
- *   if p.feature.IsEnabled(ctx, "ff_tmp_outbox_event_task_created_topic") { // [true]
+ *   ff.IsEnabled(ctx, "ff_my_flag")        // [true]
+ *   client.Evaluate("ff_my_flag", entity)  // [true]
+ *   const myFlag = "ff_my_flag"            // [true]
  *
- * Поддерживает два варианта передачи имени флага:
- *   - строковый литерал:   IsEnabled(ctx, "flag_name")
- *   - именованная константа: IsEnabled(ctx, tmpFFDisconnectedConsumer)
+ * Поддерживает два варианта:
+ *   - строковый литерал:      "flag_name"
+ *   - именованная константа:  myFlagConst  (резолвится к строке)
  *
  * Данные берёт из feature-flags.json через FeatureFlagService.
  */
@@ -54,40 +55,37 @@ class FeatureFlagInlayHintsProvider : InlayHintsProvider<NoSettings> {
         settings: NoSettings,
         sink: InlayHintsSink,
     ): InlayHintsCollector {
+        // Загружаем флаги один раз на весь проход по файлу, а не на каждый элемент.
+        val flags = file.project.getService(FeatureFlagService::class.java).getFlags()
+        // Минимальная длина ключа - для пре-фильтрации ссылок до вызова resolve().
+        val minKeyLength = flags?.keys?.minOfOrNull { it.length } ?: Int.MAX_VALUE
+
         return object : FactoryInlayHintsCollector(editor) {
 
             override fun collect(element: PsiElement, editor: Editor, sink: InlayHintsSink): Boolean {
-                if (element !is GoCallExpr) return true
+                if (flags == null) return true
 
-                // Определяем имя вызываемого метода.
-                // Для i.ff.IsEnabled(...)  expression — это GoReferenceExpression,
-                // у которого identifier содержит "IsEnabled".
-                val callee = element.expression as? GoReferenceExpression ?: return true
-                if (callee.identifier?.text != "IsEnabled") return true
-
-                val args = element.argumentList?.expressionList ?: return true
-                // Ожидаем минимум 2 аргумента: (ctx, flagName)
-                if (args.size < 2) return true
-
-                val flagArg = args[1]
-
-                val flagKey: String = when (flagArg) {
-                    is GoStringLiteral -> flagArg.stringValue()
-                    is GoReferenceExpression -> resolveConstantValue(flagArg)
-                    else -> null
+                val flagKey: String = when {
+                    element is GoStringLiteral ->
+                        element.stringValue()
+                    // Любые ссылки - пробуем резолвить как константу.
+                    // pkg.Const (пакетные константы) и простые ссылки обрабатываются одинаково.
+                    // obj.Field и методы resolveConstantValue вернёт null (as? GoConstDefinition).
+                    // Пре-фильтр по длине отсекает короткие идентификаторы (ctx, err, i…)
+                    // до дорогого вызова resolve().
+                    element is GoReferenceExpression &&
+                        (element.identifier?.textLength ?: 0) >= minKeyLength ->
+                        resolveConstantValue(element)
+                    else -> return true
                 } ?: return true
 
-                val service = element.project.getService(FeatureFlagService::class.java)
-                val flags = service.getFlags() ?: return true
-                val enabled = flags[flagKey] ?: return true // флаг не найден в файле — молчим
+                val enabled = flags[flagKey] ?: return true
 
-                // пока посмотрим с true|false потом можно переделать на "prod:✓"|"prod:✗"
                 val label = if (enabled) "true" else "false"
                 val presentation = factory.roundWithBackground(factory.smallText(label))
 
-                // Hint ставим сразу после аргумента с именем флага
                 sink.addInlineElement(
-                    offset = flagArg.textRange.endOffset,
+                    offset = element.textRange.endOffset,
                     relatesToPrecedingText = true,
                     presentation = presentation,
                 )
